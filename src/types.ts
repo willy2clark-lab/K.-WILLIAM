@@ -136,3 +136,5 @@ export interface AIAnalysisResult {
   predictedReturnReductionOpportunity: number;
   supplierActionPlan: string[];
 }
+
+export type UserRole = 'admin' | 'partner';

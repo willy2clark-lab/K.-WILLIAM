@@ -12,6 +12,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      // Filter benign Vite dev websocket notification in sandboxed cloud preview
+      (function() {
+        const _err = console.error;
+        console.error = function(...args) {
+          if (typeof args[0] === 'string' && args[0].includes('[vite] failed to connect to websocket')) {
+            return;
+          }
+          _err.apply(console, args);
+        };
+      })();
+    </script>
   </head>
   <body class="font-sans antialiased bg-slate-50 text-slate-900">
     <div id="root"></div>

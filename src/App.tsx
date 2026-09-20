@@ -16,7 +16,8 @@ import {
   StockAlert, 
   DailyFeedCard, 
   DeviceCategory, 
-  AIAnalysisResult 
+  AIAnalysisResult,
+  UserRole
 } from './types';
 import { Header } from './components/Header';
 import { KpiSummary } from './components/KpiSummary';
@@ -28,6 +29,11 @@ import { WhatIfSimulator } from './components/WhatIfSimulator';
 import { MobileActionFeed } from './components/MobileActionFeed';
 import { SalesCopilotModal } from './components/SalesCopilotModal';
 import { ExportModal } from './components/ExportModal';
+import { SystemDiagnostics } from './components/SystemDiagnostics';
+import { AnalysisChatView } from './components/AnalysisChatView';
+import { WelcomeModal } from './components/WelcomeModal';
+import { CsvImportModal } from './components/CsvImportModal';
+import { PartnerSummaryView } from './components/PartnerSummaryView';
 import { Sparkles, Bot, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export default function App() {
@@ -39,6 +45,9 @@ export default function App() {
   const [feedCards, setFeedCards] = useState<DailyFeedCard[]>(INITIAL_DAILY_FEED);
   const [forecastSeries, setForecastSeries] = useState(FORECAST_SERIES);
 
+  // User Role State: 'admin' (Directeur des ventes) or 'partner' (Partenaire commercial)
+  const [userRole, setUserRole] = useState<UserRole>('admin');
+
   // Navigation & Filter state
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [selectedDeviceFilter, setSelectedDeviceFilter] = useState<'all' | DeviceCategory>('all');
@@ -46,6 +55,14 @@ export default function App() {
   const [isMobileSimulator, setIsMobileSimulator] = useState<boolean>(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [isImportCsvOpen, setIsImportCsvOpen] = useState<boolean>(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pilotage_welcome_seen') !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -163,17 +180,73 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        userRole={userRole}
+        setUserRole={(role) => {
+          setUserRole(role);
+          if (role === 'partner') {
+            setIsMobileSimulator(false);
+            if (activeTab === 'settings' || activeTab === 'suppliers' || activeTab === 'whatif' || activeTab === 'stock' || activeTab === 'reviews') {
+              setActiveTab('overview');
+            }
+          }
+        }}
         isMobileSimulator={isMobileSimulator}
         setIsMobileSimulator={setIsMobileSimulator}
         onOpenCopilot={() => setIsCopilotOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
+        onOpenImportCsv={userRole === 'partner' ? undefined : () => setIsImportCsvOpen(true)}
+        onOpenWelcome={() => setIsWelcomeOpen(true)}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
         alertCount={alerts.filter((a) => !a.executed).length}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {isMobileSimulator ? (
+        {userRole === 'partner' ? (
+          /* Partner View: Clean Final Summary & Read-only Strategic Insights */
+          <div>
+            {/* Tab 1: Partner Final Summary */}
+            {activeTab === 'overview' && (
+              <PartnerSummaryView
+                products={products}
+                trafficData={trafficData}
+                reviews={reviews}
+                alerts={alerts}
+                onOpenExport={() => setIsExportOpen(true)}
+                onOpenChat={() => setIsCopilotOpen(true)}
+              />
+            )}
+
+            {/* Tab 2: Devices & Multi-Channel Performance */}
+            {activeTab === 'devices' && (
+              <div className="space-y-6">
+                <SalesDeviceAnalytics
+                  products={products}
+                  trafficData={trafficData}
+                  selectedDeviceFilter={selectedDeviceFilter}
+                  setSelectedDeviceFilter={setSelectedDeviceFilter}
+                  selectedCategoryFilter={selectedCategoryFilter}
+                  setSelectedCategoryFilter={setSelectedCategoryFilter}
+                  onOpenExport={() => setIsExportOpen(true)}
+                />
+              </div>
+            )}
+
+            {/* Tab 7: AI Analysis Chat for Partners */}
+            {activeTab === 'analysis-chat' && (
+              <AnalysisChatView
+                products={products}
+                trafficData={trafficData}
+                reviews={reviews}
+                purchaseOrders={purchaseOrders}
+                alerts={alerts}
+                forecastSeries={forecastSeries}
+                onNotify={showToast}
+                onOpenExport={() => setIsExportOpen(true)}
+              />
+            )}
+          </div>
+        ) : isMobileSimulator ? (
           /* Mobile-First Daily Feed Mode */
           <div className="flex flex-col items-center">
             <div className="mb-4 text-center">
@@ -200,7 +273,7 @@ export default function App() {
             />
           </div>
         ) : (
-          /* Full Desktop Dashboard Views */
+          /* Full Desktop Dashboard Views (Director / Admin) */
           <div>
             {/* Global KPI Summary Bar */}
             <KpiSummary products={products} trafficData={trafficData} />
@@ -279,16 +352,57 @@ export default function App() {
             {activeTab === 'whatif' && (
               <WhatIfSimulator products={products} trafficData={trafficData} />
             )}
+
+            {/* Tab 7: AI Analysis Chat */}
+            {activeTab === 'analysis-chat' && (
+              <AnalysisChatView
+                products={products}
+                trafficData={trafficData}
+                reviews={reviews}
+                purchaseOrders={purchaseOrders}
+                alerts={alerts}
+                forecastSeries={forecastSeries}
+                onNotify={showToast}
+                onOpenExport={() => setIsExportOpen(true)}
+              />
+            )}
+
+            {/* Tab 8: Settings & System Diagnostics */}
+            {activeTab === 'settings' && (
+              <SystemDiagnostics onNotify={showToast} />
+            )}
           </div>
         )}
       </main>
 
-      {/* AI Sales Copilot Assistant Modal */}
+      {/* Floating Chat Window Launcher Button (Persistent across all dashboard tabs & mobile simulator) */}
+      <button
+        type="button"
+        id="btn-floating-chat-launcher"
+        onClick={() => setIsCopilotOpen(true)}
+        className="fixed bottom-5 right-5 z-40 flex items-center space-x-2.5 px-4 py-3 bg-slate-900 text-white rounded-full shadow-2xl hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all border border-slate-700 cursor-pointer group"
+        title="Ouvrir la fenêtre de chat d'analyse IA"
+      >
+        <div className="relative flex items-center justify-center">
+          <Bot className="w-5 h-5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+        </div>
+        <span className="text-xs font-bold tracking-tight text-white pr-1">
+          Chat d'Analyse IA
+        </span>
+      </button>
+
+      {/* AI Sales Copilot Assistant Modal Window */}
       <SalesCopilotModal
         isOpen={isCopilotOpen}
         onClose={() => setIsCopilotOpen(false)}
         products={products}
         trafficData={trafficData}
+        onNavigateToFullChat={() => {
+          setIsCopilotOpen(false);
+          setActiveTab('analysis-chat');
+        }}
       />
 
       {/* Daily Results Spreadsheet Export Modal */}
@@ -299,6 +413,38 @@ export default function App() {
         trafficData={trafficData}
         forecastSeries={forecastSeries}
         onNotify={showToast}
+      />
+
+      {/* CSV Catalogue & Sales Import Modal */}
+      <CsvImportModal
+        isOpen={isImportCsvOpen}
+        onClose={() => setIsImportCsvOpen(false)}
+        onImportProducts={(imported) => {
+          setProducts(imported);
+          showToast(`${imported.length} produits importés et actualisés avec succès !`);
+        }}
+        onNotify={showToast}
+      />
+
+      {/* New User Welcome & Onboarding Guide Modal */}
+      <WelcomeModal
+        isOpen={isWelcomeOpen}
+        userRole={userRole}
+        onClose={() => setIsWelcomeOpen(false)}
+        onOpenChat={() => {
+          setIsWelcomeOpen(false);
+          setIsCopilotOpen(true);
+        }}
+        onOpenImportCsv={() => {
+          setIsWelcomeOpen(false);
+          if (userRole !== 'partner') {
+            setIsImportCsvOpen(true);
+          }
+        }}
+        onOpenExport={() => {
+          setIsWelcomeOpen(false);
+          setIsExportOpen(true);
+        }}
       />
     </div>
   );
