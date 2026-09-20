@@ -1,0 +1,6 @@
+{
+  "name": "Pilotage Commercial & Stocks IA",
+  "description": "Application pour Directeur des Ventes : suivi des ventes par support (Mobile, Tablette, Desktop), analyse IA des avis clients et gestion prédictive des stocks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
